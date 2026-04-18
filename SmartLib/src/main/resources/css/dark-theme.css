@@ -1,0 +1,191 @@
+/* ─── GLOBAL DEFAULTS ─── */
+.root {
+    -fx-font-family: 'Segoe UI', sans-serif;
+}
+
+.main-area {
+    -fx-background-color: #0f172a; /* Deep Slate Navy */
+}
+
+/* ─── 1. TOP BAR & APP NAVIGATION ─── */
+.topbar {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #334155;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 10 20;
+}
+
+.hamburger-icon {
+    -fx-text-fill: #38bdf8;
+    -fx-font-size: 24px;
+    -fx-cursor: hand;
+    -fx-padding: 5 12;
+    -fx-background-color: rgba(56, 189, 248, 0.1);
+    -fx-background-radius: 8;
+}
+
+.hamburger-icon:hover {
+    -fx-background-color: rgba(56, 189, 248, 0.2);
+    -fx-text-fill: #ffffff;
+}
+
+.top-badge {
+    -fx-background-color: #38bdf8;
+    -fx-text-fill: #0f172a;
+    -fx-font-weight: bold;
+    -fx-padding: 4 15;
+    -fx-background-radius: 15;
+}
+
+/* ─── 2. CARDS & STAT BOXES ─── */
+.stat-card-box, .alert-card-box {
+    -fx-background-color: linear-gradient(to bottom right, #1e293b, #111827);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-width: 2;
+    -fx-border-color: #334155; /* Default border */
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.6), 15, 0, 0, 10);
+}
+
+/* Specific Accent Borders (Using !important to ensure visibility) */
+.card-blue   { -fx-border-color: #38bdf8 !important; }
+.card-green  { -fx-border-color: #34d399 !important; }
+.card-yellow { -fx-border-color: #fbbf24 !important; }
+.card-red    { -fx-border-color: #f87171 !important; }
+
+/* Typography within Cards */
+.card-title-main {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-border-color: #38bdf8;
+    -fx-border-width: 0 0 2 0;
+    -fx-padding: 0 0 5 0;
+}
+
+.stat-label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-weight: bold;
+    -fx-font-size: 11px;
+}
+
+.stat-value {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+}
+
+/* ─── 3. NOTIFICATIONS & ALERTS ─── */
+.notif-red   { -fx-background-color: rgba(239, 68, 68, 0.08); -fx-border-color: #ef4444 !important; }
+.notif-warn  { -fx-background-color: rgba(245, 158, 11, 0.08); -fx-border-color: #f59e0b !important; }
+.notif-green { -fx-background-color: rgba(16, 185, 129, 0.08); -fx-border-color: #10b981 !important; }
+
+.notif-title { -fx-text-fill: #f1f5f9; -fx-font-weight: bold; }
+.notif-sub   { -fx-text-fill: #94a3b8; -fx-font-size: 12px; }
+
+/* ─── 4. TABLES (Library & Inventory) ─── */
+.table-view {
+    -fx-background-color: transparent;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.table-view .column-header, .table-view .filler {
+    -fx-background-color: #1e293b;
+    -fx-size: 40;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-weight: bold;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.table-row-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #e2e8f0;
+    -fx-border-color: #1e293b;
+    -fx-border-width: 0 0 1 0;
+}
+
+.table-row-cell:odd { -fx-background-color: rgba(30, 41, 59, 0.3); }
+.table-row-cell:hover { -fx-background-color: rgba(56, 189, 248, 0.1); }
+
+/* Status Pills */
+.status-pill { -fx-background-radius: 20; -fx-padding: 3 12; -fx-font-size: 11px; -fx-font-weight: bold; }
+.pill-available { -fx-background-color: #064e3b; -fx-text-fill: #34d399; }
+.pill-reserved  { -fx-background-color: #451a03; -fx-text-fill: #fbbf24; }
+.pill-unavail   { -fx-background-color: #450a0a; -fx-text-fill: #f87171; }
+
+/* ─── 5. FORMS & BUTTONS ─── */
+.dark-field {
+    -fx-background-color: #0f172a;
+    -fx-text-fill: white;
+    -fx-border-color: #334155;
+    -fx-border-radius: 6;
+    -fx-padding: 10;
+}
+
+.dark-field:focused {
+    -fx-border-color: #38bdf8;
+    -fx-effect: dropshadow(three-pass-box, rgba(56, 189, 248, 0.2), 8, 0, 0, 0);
+}
+
+.form-label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-weight: bold;
+}
+
+.btn-primary {
+    -fx-background-color: #38bdf8;
+    -fx-text-fill: #0f172a;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+    -fx-padding: 10 20;
+}
+
+.btn-primary:hover {
+    -fx-background-color: #7dd3fc;
+}
+
+/* ─── 6. SIDEBAR MENU ─── */
+.sidebar-container {
+    -fx-background-color: rgba(15, 23, 42, 0.95);
+}
+
+.sidebar-content-box {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 16;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 30, 0, 0, 0);
+}
+
+.nav-item {
+    -fx-background-color: #111827;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-border-width: 1;
+}
+
+.nav-item:hover {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #38bdf8;
+}
+
+.nav-label {
+    -fx-text-fill: #f1f5f9;
+}
+
+.close-menu-btn {
+    -fx-text-fill: #64748b;
+}
+
+.close-menu-btn:hover {
+    -fx-text-fill: #f87171;
+}
+
+/* ─── 7. ANALYTICS SPECIFIC ─── */
+.bar-label { -fx-text-fill: #cbd5e1; }
+.track-bg { -fx-background-color: #1e293b; -fx-background-radius: 4; }
