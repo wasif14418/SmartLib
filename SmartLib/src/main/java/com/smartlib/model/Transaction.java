@@ -15,9 +15,10 @@ public class Transaction {
     private final ObjectProperty<LocalDate> dueDate;
     private final BooleanProperty returned;
 
+    // FIX: Added missing 9th parameter 'returned' to match how LibraryService constructs Transaction
     public Transaction(String txnId, String studentName, String studentId,
                        String batch, String department, String bookTitle,
-                       LocalDate issueDate, LocalDate dueDate) {
+                       LocalDate issueDate, LocalDate dueDate, boolean returned) {
         this.txnId       = new SimpleStringProperty(txnId);
         this.studentName = new SimpleStringProperty(studentName);
         this.studentId   = new SimpleStringProperty(studentId);
@@ -26,7 +27,7 @@ public class Transaction {
         this.bookTitle   = new SimpleStringProperty(bookTitle);
         this.issueDate   = new SimpleObjectProperty<>(issueDate);
         this.dueDate     = new SimpleObjectProperty<>(dueDate);
-        this.returned    = new SimpleBooleanProperty(false);
+        this.returned    = new SimpleBooleanProperty(returned); // FIX: was always hardcoded false
     }
 
     /** Days remaining (negative = overdue). */
@@ -49,6 +50,7 @@ public class Transaction {
     }
 
     // Getters
+    public String     getId()          { return txnId.get(); }  // FIX: Added missing getId() used by LibraryService.returnBook()
     public String     getTxnId()       { return txnId.get(); }
     public String     getStudentName() { return studentName.get(); }
     public String     getStudentId()   { return studentId.get(); }

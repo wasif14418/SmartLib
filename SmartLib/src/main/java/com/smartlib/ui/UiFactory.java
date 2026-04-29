@@ -101,7 +101,7 @@ public class UiFactory {
         } else if (lower.contains("reserved") || lower.contains("pending")) {
             pill.getStyleClass().add("pill-reserved");
         } else if (lower.contains("overdue") || lower.contains("unavailable")) {
-            pill.getStyleClass().add("pill-overdue");
+            pill.getStyleClass().add("pill-unavail"); // Changed to pill-unavail
         }
         return pill;
     }

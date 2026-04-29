@@ -1,6 +1,7 @@
 module com.smartlib {
     requires javafx.controls;
     requires javafx.fxml;
+    requires java.sql; // Added this line
 
     opens com.smartlib to javafx.fxml;
     opens com.smartlib.model to javafx.base;

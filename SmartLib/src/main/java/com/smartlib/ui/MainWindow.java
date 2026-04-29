@@ -155,7 +155,7 @@ public class MainWindow {
         contentArea.getChildren().clear();
         switch (id) {
             case "dashboard" -> {
-                dashPage = new DashboardPage().build();
+                dashPage = new DashboardPage(this::showPage).build(); // Updated: Pass showPage reference
                 contentArea.getChildren().add(dashPage);
                 topBadge.setText("Overview");
             }

@@ -62,6 +62,7 @@ public class BooksPage {
         TableColumn<Book, String>  colId   = col("Book ID",   "bookId",   120);
         TableColumn<Book, String>  colTit  = col("Title",     "title",    260);
         TableColumn<Book, String>  colAuth = col("Author",    "author",   180);
+        TableColumn<Book, String>  colIsbn = col("ISBN",      "isbn",     150); // Added ISBN column
         TableColumn<Book, Integer> colTot  = colInt("Total Qty",  "totalQty",  90);
         TableColumn<Book, Integer> colAvl  = colInt("Available",  "available", 90);
         TableColumn<Book, Integer> colRes  = colInt("Reserved",   "reserved",  90);
@@ -76,7 +77,7 @@ public class BooksPage {
             }
         });
 
-        tv.getColumns().addAll(colId, colTit, colAuth, colTot, colAvl, colRes, colStat);
+        tv.getColumns().addAll(colId, colTit, colAuth, colIsbn, colTot, colAvl, colRes, colStat); // Added colIsbn
         return tv;
     }
 
@@ -105,12 +106,14 @@ public class BooksPage {
         TextField fId     = field("e.g. BK-007");
         TextField fTitle  = field("Book title");
         TextField fAuthor = field("Author name");
+        TextField fIsbn   = field("e.g. 978-1234567890"); // New ISBN field
         TextField fQty    = field("e.g. 4");
 
         grid.addRow(0, lbl("Book ID"),   fId);
         grid.addRow(1, lbl("Title"),     fTitle);
         grid.addRow(2, lbl("Author"),    fAuthor);
-        grid.addRow(3, lbl("Quantity"),  fQty);
+        grid.addRow(3, lbl("ISBN"),      fIsbn); // Added ISBN row
+        grid.addRow(4, lbl("Quantity"),  fQty);
 
         Button save = new Button("✅ Add Book");
         save.getStyleClass().addAll("btn", "btn-primary");
@@ -120,8 +123,9 @@ public class BooksPage {
         save.setOnAction(e -> {
             try {
                 int qty = Integer.parseInt(fQty.getText().trim());
+                // Updated Book constructor call to include ISBN
                 svc.addBook(new Book(fId.getText().trim(), fTitle.getText().trim(),
-                        fAuthor.getText().trim(), qty, qty, 0));
+                        fAuthor.getText().trim(), fIsbn.getText().trim(), qty, qty, 0));
                 dlg.close();
             } catch (NumberFormatException ex) {
                 fQty.setStyle("-fx-border-color: #ef4444;");
@@ -131,9 +135,9 @@ public class BooksPage {
 
         HBox btns = new HBox(10, save, cancel);
         btns.setPadding(new Insets(4, 0, 0, 0));
-        grid.add(btns, 0, 4, 2, 1);
+        grid.add(btns, 0, 5, 2, 1); // Adjusted row index for buttons
 
-        Scene sc = new Scene(grid, 380, 260);
+        Scene sc = new Scene(grid, 380, 300); // Adjusted dialog size
         sc.getStylesheets().add(getClass().getResource("/css/dark-theme.css").toExternalForm());
         dlg.setScene(sc);
         dlg.showAndWait();
