@@ -12,7 +12,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * Data store using JDBC/H2 database.
+ * Singleton service — all data operations go through the persistent H2 database.
  */
 public class LibraryService {
 
@@ -30,14 +30,19 @@ public class LibraryService {
         return instance;
     }
 
-    // ── Accessors ─────────────────────────────────────────────────────────────
+    // ── Read operations ───────────────────────────────────────────────────────
 
     public ObservableList<Book> getBooks() {
         ObservableList<Book> books = FXCollections.observableArrayList();
-        String sql = "SELECT id, title, author, isbn, totalCopies, availableCopies FROM Books";
+        // Also compute reserved count from active prebookings
+        String sql =
+                "SELECT b.id, b.title, b.author, b.isbn, b.totalCopies, b.availableCopies, " +
+                        "       (SELECT COUNT(*) FROM Prebookings p " +
+                        "        WHERE p.bookId = b.id AND (p.status = 'PENDING' OR p.status = 'CONFIRMED')) AS reservedCount " +
+                        "FROM Books b";
         try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+             Statement stmt  = conn.createStatement();
+             ResultSet rs    = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 books.add(new Book(
                         rs.getString("id"),
@@ -46,7 +51,7 @@ public class LibraryService {
                         rs.getString("isbn"),
                         rs.getInt("totalCopies"),
                         rs.getInt("availableCopies"),
-                        0 // Reserved count requires separate query
+                        rs.getInt("reservedCount")
                 ));
             }
         } catch (SQLException e) {
@@ -57,28 +62,34 @@ public class LibraryService {
 
     public ObservableList<Transaction> getTransactions() {
         ObservableList<Transaction> transactions = FXCollections.observableArrayList();
-        String sql = "SELECT b.id AS bookId, b.title AS bookTitle, " +
-                "m.id AS memberId, m.name AS memberName, " +
-                "t.id AS transactionId, t.borrowDate, t.dueDate, t.returnDate " +
-                "FROM Borrowings t " +
-                "JOIN Books b ON t.bookId = b.id " +
-                "JOIN Members m ON t.memberId = m.id";
+        // Now reads batch and department from the Borrowings table
+        String sql =
+                "SELECT t.id AS transactionId, " +
+                        "       m.name AS memberName, m.id AS memberId, " +
+                        "       t.batch, t.department, " +
+                        "       b.title AS bookTitle, " +
+                        "       t.borrowDate, t.dueDate, t.returnDate " +
+                        "FROM Borrowings t " +
+                        "JOIN Books   b ON t.bookId   = b.id " +
+                        "JOIN Members m ON t.memberId = m.id " +
+                        "ORDER BY t.borrowDate DESC";
         try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+             Statement stmt  = conn.createStatement();
+             ResultSet rs    = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                // FIX: returnDate is properly checked and used to set the 'returned' boolean
                 boolean isReturned = rs.getDate("returnDate") != null;
+                String batch = rs.getString("batch");
+                String dept  = rs.getString("department");
                 transactions.add(new Transaction(
                         rs.getString("transactionId"),
                         rs.getString("memberName"),
                         rs.getString("memberId"),
-                        "N/A", // Batch - not stored in DB
-                        "N/A", // Dept - not stored in DB
+                        batch != null ? batch : "N/A",
+                        dept  != null ? dept  : "N/A",
                         rs.getString("bookTitle"),
                         rs.getDate("borrowDate").toLocalDate(),
                         rs.getDate("dueDate").toLocalDate(),
-                        isReturned  // FIX: was missing this argument; constructor now accepts it
+                        isReturned
                 ));
             }
         } catch (SQLException e) {
@@ -89,15 +100,18 @@ public class LibraryService {
 
     public ObservableList<PreBooking> getPreBookings() {
         ObservableList<PreBooking> preBookings = FXCollections.observableArrayList();
-        String sql = "SELECT pb.id AS prebookId, b.title AS bookTitle, " +
-                "m.name AS memberName, m.id AS memberId, " +
-                "pb.prebookDate, pb.status " +
-                "FROM Prebookings pb " +
-                "JOIN Books b ON pb.bookId = b.id " +
-                "JOIN Members m ON pb.memberId = m.id";
+        String sql =
+                "SELECT pb.id AS prebookId, " +
+                        "       b.title AS bookTitle, " +
+                        "       m.name AS memberName, m.id AS memberId, " +
+                        "       pb.prebookDate, pb.status " +
+                        "FROM Prebookings pb " +
+                        "JOIN Books   b ON pb.bookId   = b.id " +
+                        "JOIN Members m ON pb.memberId = m.id " +
+                        "ORDER BY pb.prebookDate ASC";
         try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+             Statement stmt  = conn.createStatement();
+             ResultSet rs    = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 preBookings.add(new PreBooking(
                         rs.getString("prebookId"),
@@ -117,135 +131,73 @@ public class LibraryService {
     // ── Stats ─────────────────────────────────────────────────────────────────
 
     public int totalBooks() {
-        String sql = "SELECT SUM(totalCopies) FROM Books";
-        try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return queryInt("SELECT COALESCE(SUM(totalCopies), 0) FROM Books");
     }
 
     public int totalAvailable() {
-        String sql = "SELECT SUM(availableCopies) FROM Books";
-        try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return queryInt("SELECT COALESCE(SUM(availableCopies), 0) FROM Books");
     }
 
     public int totalBorrowed() {
-        String sql = "SELECT COUNT(*) FROM Borrowings WHERE returnDate IS NULL";
-        try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return queryInt("SELECT COUNT(*) FROM Borrowings WHERE returnDate IS NULL");
     }
 
     public int totalOverdue() {
-        String sql = "SELECT COUNT(*) FROM Borrowings WHERE returnDate IS NULL AND dueDate < CURRENT_DATE()";
-        try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return queryInt("SELECT COUNT(*) FROM Borrowings WHERE returnDate IS NULL AND dueDate < CURRENT_DATE()");
     }
 
     public int totalReserved() {
-        String sql = "SELECT COUNT(*) FROM Prebookings WHERE status = 'PENDING' OR status = 'CONFIRMED'";
-        try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return queryInt("SELECT COUNT(*) FROM Prebookings WHERE status = 'PENDING' OR status = 'CONFIRMED'");
     }
 
     public int dueToday() {
-        String sql = "SELECT COUNT(*) FROM Borrowings WHERE returnDate IS NULL AND dueDate = CURRENT_DATE()";
-        try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return queryInt("SELECT COUNT(*) FROM Borrowings WHERE returnDate IS NULL AND dueDate = CURRENT_DATE()");
     }
 
     public int activeMembers() {
-        String sql = "SELECT COUNT(*) FROM Members";
-        try (Connection conn = dbManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return queryInt("SELECT COUNT(*) FROM Members");
     }
 
-    // ── Mutations ─────────────────────────────────────────────────────────────
+    // ── Write operations ──────────────────────────────────────────────────────
 
+    /**
+     * Register a new borrow. Creates the member record if they don't exist yet.
+     * Batch and department are now persisted to the Borrowings table.
+     */
     public void registerBorrow(String studentName, String studentId,
                                String batch, String dept,
                                Book book, LocalDate issueDate, LocalDate dueDate) {
-        String transactionId = UUID.randomUUID().toString();
-        String memberId = getMemberIdByName(studentName);
-        if (memberId == null) {
-            memberId = UUID.randomUUID().toString();
-            addMember(new Member(memberId, studentName, studentId + "@example.com"));
-        }
 
-        String insertSql = "INSERT INTO Borrowings (id, bookId, memberId, borrowDate, dueDate, returnDate) VALUES (?, ?, ?, ?, ?, ?)";
-        // FIX: Use book.getId() — this required adding getId() to Book.java
-        String updateBookSql = "UPDATE Books SET availableCopies = availableCopies - 1 WHERE id = ?";
+        String memberId = getOrCreateMember(studentName, studentId);
+
+        String insertSql =
+                "INSERT INTO Borrowings (id, bookId, memberId, batch, department, borrowDate, dueDate, returnDate) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, NULL)";
+        String updateBookSql =
+                "UPDATE Books SET availableCopies = availableCopies - 1 WHERE id = ? AND availableCopies > 0";
 
         try (Connection conn = dbManager.getConnection()) {
             conn.setAutoCommit(false);
+            try (PreparedStatement psBorrow = conn.prepareStatement(insertSql);
+                 PreparedStatement psBook   = conn.prepareStatement(updateBookSql)) {
 
-            try (PreparedStatement pstmt = conn.prepareStatement(insertSql);
-                 PreparedStatement pstmtBook = conn.prepareStatement(updateBookSql)) {
+                psBorrow.setString(1, UUID.randomUUID().toString());
+                psBorrow.setString(2, book.getId());
+                psBorrow.setString(3, memberId);
+                psBorrow.setString(4, batch);
+                psBorrow.setString(5, dept);
+                psBorrow.setDate(6, Date.valueOf(issueDate));
+                psBorrow.setDate(7, Date.valueOf(dueDate));
+                psBorrow.executeUpdate();
 
-                pstmt.setString(1, transactionId);
-                pstmt.setString(2, book.getId());  // FIX: book.getId() now exists
-                pstmt.setString(3, memberId);
-                pstmt.setDate(4, Date.valueOf(issueDate));
-                pstmt.setDate(5, Date.valueOf(dueDate));
-                pstmt.setNull(6, Types.DATE);
-                pstmt.executeUpdate();
-
-                pstmtBook.setString(1, book.getId());  // FIX: book.getId() now exists
-                pstmtBook.executeUpdate();
+                psBook.setString(1, book.getId());
+                int updated = psBook.executeUpdate();
+                if (updated == 0) {
+                    // No available copies — roll back to be safe
+                    conn.rollback();
+                    System.err.println("registerBorrow: no available copies for book " + book.getId());
+                    return;
+                }
 
                 conn.commit();
             } catch (SQLException e) {
@@ -257,45 +209,43 @@ public class LibraryService {
         }
     }
 
+    /**
+     * Mark a transaction as returned and increment the book's available count.
+     */
     public void returnBook(Transaction txn) {
-        // FIX: Separated the two SQL operations to avoid unreliable correlated subquery on same connection.
-        // First fetch the bookId, then update both tables explicitly.
-        String getBookIdSql = "SELECT bookId FROM Borrowings WHERE id = ?";
-        String updateTransactionSql = "UPDATE Borrowings SET returnDate = CURRENT_DATE() WHERE id = ?";
-        String updateBookSql = "UPDATE Books SET availableCopies = availableCopies + 1 WHERE id = ?";
+        String getBookIdSql   = "SELECT bookId FROM Borrowings WHERE id = ?";
+        String markReturnedSql = "UPDATE Borrowings SET returnDate = CURRENT_DATE() WHERE id = ? AND returnDate IS NULL";
+        String updateBookSql  = "UPDATE Books SET availableCopies = availableCopies + 1 WHERE id = ?";
 
         try (Connection conn = dbManager.getConnection()) {
             conn.setAutoCommit(false);
-
             try {
-                // Step 1: get bookId for this transaction
+                // Step 1: find which book this transaction is for
                 String bookId = null;
-                try (PreparedStatement pstmtGet = conn.prepareStatement(getBookIdSql)) {
-                    pstmtGet.setString(1, txn.getId()); // FIX: txn.getId() now exists (was missing in Transaction)
-                    try (ResultSet rs = pstmtGet.executeQuery()) {
-                        if (rs.next()) {
-                            bookId = rs.getString("bookId");
-                        }
+                try (PreparedStatement ps = conn.prepareStatement(getBookIdSql)) {
+                    ps.setString(1, txn.getId());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) bookId = rs.getString("bookId");
                     }
                 }
-
                 if (bookId == null) {
-                    throw new SQLException("No borrowing record found for transaction id: " + txn.getId());
+                    throw new SQLException("No borrowing found for transaction id: " + txn.getId());
                 }
 
                 // Step 2: mark as returned
-                try (PreparedStatement pstmtTxn = conn.prepareStatement(updateTransactionSql)) {
-                    pstmtTxn.setString(1, txn.getId());
-                    pstmtTxn.executeUpdate();
+                try (PreparedStatement ps = conn.prepareStatement(markReturnedSql)) {
+                    ps.setString(1, txn.getId());
+                    ps.executeUpdate();
                 }
 
-                // Step 3: increment available copies
-                try (PreparedStatement pstmtBook = conn.prepareStatement(updateBookSql)) {
-                    pstmtBook.setString(1, bookId);
-                    pstmtBook.executeUpdate();
+                // Step 3: restore available copy
+                try (PreparedStatement ps = conn.prepareStatement(updateBookSql)) {
+                    ps.setString(1, bookId);
+                    ps.executeUpdate();
                 }
 
                 conn.commit();
+                txn.setReturned(true); // Update in-memory state so the UI refreshes instantly
             } catch (SQLException e) {
                 conn.rollback();
                 e.printStackTrace();
@@ -305,72 +255,115 @@ public class LibraryService {
         }
     }
 
+    /**
+     * Add a pre-booking. Creates the member record if they don't exist yet.
+     */
     public void addPreBooking(String studentName, String studentId,
                               Book book, LocalDate prebookDate) {
-        String prebookId = UUID.randomUUID().toString();
-        String memberId = getMemberIdByName(studentName);
-        if (memberId == null) {
-            memberId = UUID.randomUUID().toString();
-            addMember(new Member(memberId, studentName, studentId + "@example.com"));
-        }
 
-        String insertSql = "INSERT INTO Prebookings (id, bookId, memberId, prebookDate, status) VALUES (?, ?, ?, ?, ?)";
+        String memberId = getOrCreateMember(studentName, studentId);
+
+        String insertSql =
+                "INSERT INTO Prebookings (id, bookId, memberId, prebookDate, status) VALUES (?, ?, ?, ?, 'PENDING')";
         try (Connection conn = dbManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
-            pstmt.setString(1, prebookId);
-            pstmt.setString(2, book.getId());  // FIX: book.getId() now exists
-            pstmt.setString(3, memberId);
-            pstmt.setDate(4, Date.valueOf(prebookDate));
-            pstmt.setString(5, "PENDING");
-            pstmt.executeUpdate();
+             PreparedStatement ps = conn.prepareStatement(insertSql)) {
+            ps.setString(1, UUID.randomUUID().toString());
+            ps.setString(2, book.getId());
+            ps.setString(3, memberId);
+            ps.setDate(4, Date.valueOf(prebookDate));
+            ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Add a new book to the inventory.
+     */
     public void addBook(Book book) {
-        String sql = "INSERT INTO Books (id, title, author, isbn, totalCopies, availableCopies) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql =
+                "INSERT INTO Books (id, title, author, isbn, totalCopies, availableCopies) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = dbManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, book.getId());  // FIX: book.getId() now exists
-            pstmt.setString(2, book.getTitle());
-            pstmt.setString(3, book.getAuthor());
-            pstmt.setString(4, book.getIsbn());
-            pstmt.setInt(5, book.getTotalQty());
-            pstmt.setInt(6, book.getAvailable());
-            pstmt.executeUpdate();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            // Generate a fresh UUID if the caller passed a blank/manual ID
+            String id = (book.getId() == null || book.getId().isBlank())
+                    ? UUID.randomUUID().toString()
+                    : book.getId();
+            ps.setString(1, id);
+            ps.setString(2, book.getTitle());
+            ps.setString(3, book.getAuthor());
+            ps.setString(4, book.getIsbn());
+            ps.setInt(5, book.getTotalQty());
+            ps.setInt(6, book.getAvailable());
+            ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Explicitly add a member record.
+     */
     public void addMember(Member member) {
         String sql = "INSERT INTO Members (id, name, contactInfo) VALUES (?, ?, ?)";
         try (Connection conn = dbManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, member.getId());
-            pstmt.setString(2, member.getName());
-            pstmt.setString(3, member.getContactInfo());
-            pstmt.executeUpdate();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, member.getId());
+            ps.setString(2, member.getName());
+            ps.setString(3, member.getContactInfo());
+            ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    // FIX: Properly closed ResultSet using try-with-resources to prevent resource leak
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Looks up a member by name. If not found, inserts a new record and returns the new ID.
+     * studentId is used as a secondary identifier stored in contactInfo.
+     */
+    private String getOrCreateMember(String name, String studentId) {
+        String existing = getMemberIdByName(name);
+        if (existing != null) return existing;
+
+        String newId = UUID.randomUUID().toString();
+        String sql = "INSERT INTO Members (id, name, contactInfo) VALUES (?, ?, ?)";
+        try (Connection conn = dbManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, newId);
+            ps.setString(2, name);
+            ps.setString(3, studentId);   // store the actual student ID
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return newId;
+    }
+
     private String getMemberIdByName(String name) {
         String sql = "SELECT id FROM Members WHERE name = ?";
         try (Connection conn = dbManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, name);
-            try (ResultSet rs = pstmt.executeQuery()) {  // FIX: ResultSet now in try-with-resources
-                if (rs.next()) {
-                    return rs.getString("id");
-                }
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, name);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getString("id");
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return null;
+    }
+
+    /** Helper to run a COUNT/SUM query that returns a single integer. */
+    private int queryInt(String sql) {
+        try (Connection conn = dbManager.getConnection();
+             Statement stmt  = conn.createStatement();
+             ResultSet rs    = stmt.executeQuery(sql)) {
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 }

@@ -26,3 +26,6 @@ public class Main extends Application {
         launch(args);
     }
 }
+
+
+//C:\Users\YourName\smartlib_data\smartlib.mv.db   tthis is where the database data is
