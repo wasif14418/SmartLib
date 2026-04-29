@@ -1,0 +1,60 @@
+/* ─── BOOKS TABLE WHITE THEME ─── */
+
+.dark-table {
+    -fx-font-size: 16px;
+    -fx-background-color: white;
+    -fx-border-color: black;
+    -fx-border-width: 1;
+}
+
+.dark-table .viewport,
+.dark-table .virtual-flow {
+    -fx-background-color: white;
+}
+
+.dark-table .table-row-cell {
+    -fx-background-color: white;
+    -fx-border-color: black;
+    -fx-border-width: 0 0 1 0; /* Bottom border for rows */
+}
+
+.dark-table .table-row-cell:odd {
+    -fx-background-color: white;
+}
+
+/* UPDATED: Added vertical column borders */
+.dark-table .table-cell {
+    -fx-text-fill: #4A1F14;
+    -fx-padding: 12 5;
+    -fx-border-color: black;        /* Column line color */
+    -fx-border-width: 0 1 0 0;      /* Only show the right border for the column effect */
+    -fx-alignment: CENTER;
+}
+
+.dark-table .table-row-cell:selected {
+    -fx-background-color: #e2e8f0;
+}
+
+.dark-table .table-row-cell:selected .table-cell {
+    -fx-text-fill: #0284c7;
+    -fx-font-weight: bold;
+}
+
+.dark-table .table-row-cell:hover {
+    -fx-background-color: #f8fafc;
+}
+
+/* UPDATED: Added vertical borders to headers to match */
+.dark-table .column-header {
+    -fx-background-color: #f1f5f9;
+    -fx-border-color: black;
+    -fx-border-width: 0 2 2 0;      /* Right and Bottom borders */
+    -fx-size: 45;
+    -fx-alignment: CENTER;
+}
+
+.dark-table .column-header .label {
+    -fx-text-fill: #475569;
+    -fx-font-weight: bold;
+    -fx-alignment: CENTER;
+}

@@ -21,77 +21,103 @@ public class BooksPage {
     public Node build() {
         VBox page = new VBox(16);
         page.setPadding(new Insets(22, 24, 22, 24));
+
+        // Load the specific CSS file for the table
+        String css = getClass().getResource("/css/books-table.css").toExternalForm();
+        page.getStylesheets().add(css);
         page.getStyleClass().add("page");
 
-        // Search field + Add button
+        // 1. Header Controls
         TextField search = new TextField();
         search.setPromptText("🔍  Search by title or author…");
-        search.getStyleClass().add("search-bar");
-        search.setPrefWidth(260);
+        search.getStyleClass().add("dark-field");
+        search.setPrefWidth(300);
 
         Button addBtn = new Button("+ Add Book");
-        addBtn.getStyleClass().addAll("btn", "btn-primary");
+        addBtn.getStyleClass().add("btn-primary");
         addBtn.setOnAction(e -> showAddBookDialog());
 
+        // 2. Create the Card Container
         VBox card = UiFactory.cardWithAction("📖  Book Inventory", search, addBtn);
-
-        // Table
-        TableView<Book> table = buildTable(search);
-        VBox.setVgrow(table, Priority.ALWAYS);
-        card.getChildren().add(table);
         VBox.setVgrow(card, Priority.ALWAYS);
+
+        // 3. Build and Configure Table
+        TableView<Book> table = buildTable(search);
+
+        // Add the table to the card's children
+        card.getChildren().add(table);
+        VBox.setVgrow(table, Priority.ALWAYS);
 
         page.getChildren().add(card);
         return page;
     }
 
-    @SuppressWarnings("unchecked")
     private TableView<Book> buildTable(TextField search) {
         FilteredList<Book> filtered = new FilteredList<>(svc.getBooks(), b -> true);
-        search.textProperty().addListener((obs, o, n) -> {
-            String q = n.toLowerCase();
-            filtered.setPredicate(b -> q.isBlank()
-                    || b.getTitle().toLowerCase().contains(q)
-                    || b.getAuthor().toLowerCase().contains(q));
+
+        search.textProperty().addListener((obs, oldVal, newVal) -> {
+            String query = newVal.toLowerCase();
+            filtered.setPredicate(book -> query.isBlank()
+                    || book.getTitle().toLowerCase().contains(query)
+                    || book.getAuthor().toLowerCase().contains(query)
+                    || book.getIsbn().toLowerCase().contains(query));
         });
 
         TableView<Book> tv = new TableView<>(filtered);
+
+        // Apply the CSS class from books-table.css
         tv.getStyleClass().add("dark-table");
+
+        // IMPORTANT: Set to -1 so row height grows automatically with font size
+        tv.setFixedCellSize(-1);
         tv.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        TableColumn<Book, String>  colId   = col("Book ID",   "bookId",   120);
-        TableColumn<Book, String>  colTit  = col("Title",     "title",    260);
-        TableColumn<Book, String>  colAuth = col("Author",    "author",   180);
-        TableColumn<Book, String>  colIsbn = col("ISBN",      "isbn",     150); // Added ISBN column
-        TableColumn<Book, Integer> colTot  = colInt("Total Qty",  "totalQty",  90);
-        TableColumn<Book, Integer> colAvl  = colInt("Available",  "available", 90);
-        TableColumn<Book, Integer> colRes  = colInt("Reserved",   "reserved",  90);
+        // Define Columns
+        tv.getColumns().addAll(
+                col("Book ID",   "bookId",   100),
+                col("Title",     "title",    250),
+                col("Author",    "author",   180),
+                col("ISBN",      "isbn",     140),
+                colInt("Total",  "totalQty",  70),
+                colInt("Avail",  "available", 70),
+                colInt("Resv",   "reserved",  70),
+                statusColumn()
+        );
 
-        TableColumn<Book, Void> colStat = new TableColumn<>("Status");
-        colStat.setMinWidth(130);
-        colStat.setCellFactory(c -> new TableCell<>() {
-            @Override protected void updateItem(Void v, boolean empty) {
-                super.updateItem(v, empty);
-                if (empty || getTableRow().getItem() == null) { setGraphic(null); return; }
-                setGraphic(UiFactory.statusPill(getTableRow().getItem().getStatus()));
-            }
-        });
-
-        tv.getColumns().addAll(colId, colTit, colAuth, colIsbn, colTot, colAvl, colRes, colStat); // Added colIsbn
         return tv;
     }
 
-    private <T> TableColumn<Book, T> col(String h, String prop, double w) {
-        TableColumn<Book, T> c = new TableColumn<>(h);
+    private TableColumn<Book, String> col(String label, String prop, double width) {
+        TableColumn<Book, String> c = new TableColumn<>(label);
         c.setCellValueFactory(new PropertyValueFactory<>(prop));
-        c.setMinWidth(w);
+        c.setMinWidth(width);
         return c;
     }
-    private TableColumn<Book, Integer> colInt(String h, String prop, double w) {
-        return col(h, prop, w);
+
+    private TableColumn<Book, Integer> colInt(String label, String prop, double width) {
+        TableColumn<Book, Integer> c = new TableColumn<>(label);
+        c.setCellValueFactory(new PropertyValueFactory<>(prop));
+        c.setMinWidth(width);
+        return c;
     }
 
-    // ── Add Book dialog ───────────────────────────────────────────────────────
+    private TableColumn<Book, Void> statusColumn() {
+        TableColumn<Book, Void> col = new TableColumn<>("Status");
+        col.setMinWidth(130);
+        col.setCellFactory(param -> new TableCell<>() {
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                    setGraphic(null);
+                } else {
+                    Book b = getTableRow().getItem();
+                    setGraphic(UiFactory.statusPill(b.getStatus()));
+                }
+            }
+        });
+        return col;
+    }
 
     private void showAddBookDialog() {
         Stage dlg = new Stage();
@@ -99,55 +125,56 @@ public class BooksPage {
         dlg.setTitle("Add New Book");
 
         GridPane grid = new GridPane();
-        grid.getStyleClass().add("dialog-grid");
-        grid.setHgap(12); grid.setVgap(12);
         grid.setPadding(new Insets(20));
+        grid.setHgap(12);
+        grid.setVgap(12);
+        grid.getStyleClass().add("main-area"); // Dark background
 
-        TextField fId     = field("e.g. BK-007");
-        TextField fTitle  = field("Book title");
-        TextField fAuthor = field("Author name");
-        TextField fIsbn   = field("e.g. 978-1234567890"); // New ISBN field
-        TextField fQty    = field("e.g. 4");
+        TextField fId = field("BK-XXXX");
+        TextField fTitle = field("Book Title");
+        TextField fAuthor = field("Author Name");
+        TextField fIsbn = field("ISBN Number");
+        TextField fQty = field("Quantity");
 
-        grid.addRow(0, lbl("Book ID"),   fId);
-        grid.addRow(1, lbl("Title"),     fTitle);
-        grid.addRow(2, lbl("Author"),    fAuthor);
-        grid.addRow(3, lbl("ISBN"),      fIsbn); // Added ISBN row
-        grid.addRow(4, lbl("Quantity"),  fQty);
+        grid.add(new Label("ID:"), 0, 0);      grid.add(fId, 1, 0);
+        grid.add(new Label("Title:"), 0, 1);   grid.add(fTitle, 1, 1);
+        grid.add(new Label("Author:"), 0, 2);  grid.add(fAuthor, 1, 2);
+        grid.add(new Label("ISBN:"), 0, 3);    grid.add(fIsbn, 1, 3);
+        grid.add(new Label("Qty:"), 0, 4);     grid.add(fQty, 1, 4);
 
         Button save = new Button("✅ Add Book");
-        save.getStyleClass().addAll("btn", "btn-primary");
-        Button cancel = new Button("Cancel");
-        cancel.getStyleClass().addAll("btn", "btn-outline");
+        save.getStyleClass().add("btn-primary");
 
         save.setOnAction(e -> {
             try {
                 int qty = Integer.parseInt(fQty.getText().trim());
-                // Updated Book constructor call to include ISBN
-                svc.addBook(new Book(fId.getText().trim(), fTitle.getText().trim(),
-                        fAuthor.getText().trim(), fIsbn.getText().trim(), qty, qty, 0));
+                svc.addBook(new Book(
+                        fId.getText().trim(),
+                        fTitle.getText().trim(),
+                        fAuthor.getText().trim(),
+                        fIsbn.getText().trim(),
+                        qty, qty, 0
+                ));
                 dlg.close();
-            } catch (NumberFormatException ex) {
-                fQty.setStyle("-fx-border-color: #ef4444;");
+            } catch (Exception ex) {
+                fQty.setStyle("-fx-border-color: red;");
             }
         });
-        cancel.setOnAction(e -> dlg.close());
 
-        HBox btns = new HBox(10, save, cancel);
-        btns.setPadding(new Insets(4, 0, 0, 0));
-        grid.add(btns, 0, 5, 2, 1); // Adjusted row index for buttons
+        HBox footer = new HBox(save);
+        footer.setAlignment(Pos.CENTER_RIGHT);
+        grid.add(footer, 1, 5);
 
-        Scene sc = new Scene(grid, 380, 300); // Adjusted dialog size
-        sc.getStylesheets().add(getClass().getResource("/css/dark-theme.css").toExternalForm());
-        dlg.setScene(sc);
+        Scene scene = new Scene(grid);
+        scene.getStylesheets().add(getClass().getResource("/css/dark-theme.css").toExternalForm());
+        dlg.setScene(scene);
         dlg.showAndWait();
     }
 
     private TextField field(String prompt) {
-        TextField t = new TextField(); t.setPromptText(prompt);
-        t.getStyleClass().add("dialog-field"); return t;
-    }
-    private Label lbl(String text) {
-        Label l = new Label(text); l.getStyleClass().add("dialog-label"); return l;
+        TextField t = new TextField();
+        t.setPromptText(prompt);
+        t.getStyleClass().add("dark-field");
+        return t;
     }
 }

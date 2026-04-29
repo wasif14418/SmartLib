@@ -1,0 +1,42 @@
+/* ─── HISTORY TABLE WHITE THEME ─── */
+.history-table {
+    -fx-font-size: 13px;
+    -fx-background-color: white;
+    -fx-border-color: black;
+    -fx-border-width: 1;
+}
+
+.history-table .viewport,
+.history-table .virtual-flow {
+    -fx-background-color: white;
+}
+
+.history-table .table-row-cell {
+    -fx-background-color: white;
+    -fx-border-color: black;
+    -fx-border-width: 0 0 1 0;
+}
+
+.history-table .table-row-cell:odd {
+    -fx-background-color: white;
+}
+
+.history-table .table-cell {
+    -fx-text-fill: #4A1F14;
+    -fx-padding: 8 5;
+    -fx-border-color: black;
+    -fx-border-width: 0 1 0 0;
+    -fx-alignment: CENTER;
+}
+
+.history-table .column-header {
+    -fx-text-fill: #0b1422;
+    -fx-background-color: #f1f5f9;
+    -fx-border-color: black;
+    -fx-border-width: 0 1 1 0;
+    -fx-alignment: CENTER;
+}
+
+.history-table .column-header .label {
+    -fx-alignment: CENTER;
+}

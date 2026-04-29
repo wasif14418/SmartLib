@@ -1,0 +1,42 @@
+/* ─── PRE-BOOKING TABLE WHITE THEME ─── */
+.prebooking-table {
+    -fx-font-size: 14px;
+    -fx-background-color: white;
+    -fx-border-color: black;
+    -fx-border-width: 1;
+}
+
+.prebooking-table .viewport,
+.prebooking-table .virtual-flow {
+    -fx-background-color: white;
+}
+
+.prebooking-table .table-row-cell {
+    -fx-background-color: white;
+    -fx-border-color: black;
+    -fx-border-width: 0 0 1 0;
+}
+
+.prebooking-table .table-row-cell:odd {
+    -fx-background-color: white;
+}
+
+.prebooking-table .table-cell {
+    -fx-text-fill: #4A1F14;
+    -fx-padding: 10 5;
+    -fx-border-color: black;
+    -fx-border-width: 0 1 0 0;
+    -fx-alignment: CENTER;
+}
+
+.prebooking-table .column-header {
+    -fx-text-fill: #0b1422;
+    -fx-background-color: #f1f5f9;
+    -fx-border-color: black;
+    -fx-border-width: 0 1 1 0;
+    -fx-alignment: CENTER;
+}
+
+.prebooking-table .column-header .label {
+    -fx-alignment: CENTER;
+}

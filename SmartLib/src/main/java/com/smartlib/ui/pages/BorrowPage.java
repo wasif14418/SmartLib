@@ -21,6 +21,7 @@ public class BorrowPage {
         scroll.getStyleClass().add("edge-to-edge");
 
         VBox page = new VBox(16);
+        page.getStylesheets().add(getClass().getResource("/css/history-table.css").toExternalForm());
         page.setPadding(new Insets(22, 24, 22, 24));
         page.getStyleClass().add("page");
 
@@ -120,7 +121,8 @@ public class BorrowPage {
         VBox card = UiFactory.card("📋  Recent Borrows");
 
         TableView<Transaction> tv = new TableView<>(svc.getTransactions());
-        tv.getStyleClass().add("dark-table");
+        tv.getStyleClass().add("history-table"); // Apply the class
+        tv.setFixedCellSize(-1);
         tv.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         tv.setPrefHeight(220);
 

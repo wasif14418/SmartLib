@@ -196,6 +196,9 @@ public class MainWindow {
         item.setPadding(new Insets(10, 15, 10, 15));
 
         Label ico = new Label(icon);
+        // --- ADD THIS LINE ---
+        ico.getStyleClass().add("nav-icon");
+
         Label lbl = new Label(label);
         lbl.getStyleClass().add("nav-label");
 

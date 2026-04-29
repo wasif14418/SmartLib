@@ -11,9 +11,6 @@ import java.sql.*;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/**
- * Singleton service — all data operations go through the persistent H2 database.
- */
 public class LibraryService {
 
     private static LibraryService instance;
@@ -30,28 +27,34 @@ public class LibraryService {
         return instance;
     }
 
-    // ── Read operations ───────────────────────────────────────────────────────
-
     public ObservableList<Book> getBooks() {
         ObservableList<Book> books = FXCollections.observableArrayList();
-        // Also compute reserved count from active prebookings
         String sql =
                 "SELECT b.id, b.title, b.author, b.isbn, b.totalCopies, b.availableCopies, " +
                         "       (SELECT COUNT(*) FROM Prebookings p " +
                         "        WHERE p.bookId = b.id AND (p.status = 'PENDING' OR p.status = 'CONFIRMED')) AS reservedCount " +
                         "FROM Books b";
+
         try (Connection conn = dbManager.getConnection();
-             Statement stmt  = conn.createStatement();
-             ResultSet rs    = stmt.executeQuery(sql)) {
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
+                int total = rs.getInt("totalCopies");
+                int physicalAvailable = rs.getInt("availableCopies");
+                int reserved = rs.getInt("reservedCount");
+
+                // FIXED: Calculate display quantity by subtracting reservations
+                int displayAvailable = physicalAvailable - reserved;
+                if (displayAvailable < 0) displayAvailable = 0;
+
                 books.add(new Book(
                         rs.getString("id"),
                         rs.getString("title"),
                         rs.getString("author"),
                         rs.getString("isbn"),
-                        rs.getInt("totalCopies"),
-                        rs.getInt("availableCopies"),
-                        rs.getInt("reservedCount")
+                        total,
+                        displayAvailable,
+                        reserved
                 ));
             }
         } catch (SQLException e) {

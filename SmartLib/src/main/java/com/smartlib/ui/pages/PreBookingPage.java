@@ -21,6 +21,7 @@ public class PreBookingPage {
         scroll.getStyleClass().add("edge-to-edge");
 
         VBox page = new VBox(16);
+        page.getStylesheets().add(getClass().getResource("/css/prebooking-table.css").toExternalForm());
         page.setPadding(new Insets(22, 24, 22, 24));
         page.getStyleClass().add("page");
 
@@ -109,7 +110,8 @@ public class PreBookingPage {
         VBox card = UiFactory.card("📋  Active Pre-Bookings");
 
         TableView<PreBooking> tv = new TableView<>(svc.getPreBookings());
-        tv.getStyleClass().add("dark-table");
+        tv.getStyleClass().add("prebooking-table"); // Apply the class
+        tv.setFixedCellSize(-1);
         tv.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         tv.setPrefHeight(200);
 

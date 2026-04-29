@@ -17,6 +17,7 @@ public class ReturnPage {
 
     public Node build() {
         VBox page = new VBox(16);
+        page.getStylesheets().add(getClass().getResource("/css/history-table.css").toExternalForm());
         page.setPadding(new Insets(22, 24, 22, 24));
         page.getStyleClass().add("page");
 
@@ -46,9 +47,10 @@ public class ReturnPage {
     }
 
     @SuppressWarnings("unchecked")
-    private TableView<Transaction> buildTable(FilteredList<Transaction> data) {
-        TableView<Transaction> tv = new TableView<>(data);
-        tv.getStyleClass().add("dark-table");
+    private TableView<Transaction> buildTable(FilteredList<Transaction> active) {
+        TableView<Transaction> tv = new TableView<>(active);
+        tv.getStyleClass().add("history-table"); // Apply the class
+        tv.setFixedCellSize(-1);
         tv.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<Transaction,String>     c1  = tc("Txn ID",     "txnId",       90);
