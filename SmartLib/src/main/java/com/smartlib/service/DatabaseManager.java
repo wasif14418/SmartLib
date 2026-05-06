@@ -11,24 +11,17 @@ import java.util.UUID;
  * The database file is stored at:
  *   Windows:  C:\Users\<you>\smartlib_data\smartlib
  *   Mac/Linux: ~/smartlib_data/smartlib
- *
- * No installation required — H2 is bundled in the app via Maven.
- * Data is preserved between app restarts.
  */
 public class DatabaseManager {
 
-    // ── Persistent file-based URL (changed from mem: to file:) ───────────────
     private static final String DB_URL;
 
     static {
-        // Store the database in the user's home directory under "smartlib_data"
         String home = System.getProperty("user.home");
         File dbDir = new File(home, "smartlib_data");
         if (!dbDir.exists()) {
             dbDir.mkdirs();
         }
-        // DB_CLOSE_DELAY=-1 keeps the connection pool alive while the app is running
-        // AUTO_SERVER=FALSE is fine for single-user desktop apps
         DB_URL = "jdbc:h2:file:" + dbDir.getAbsolutePath().replace("\\", "/")
                 + "/smartlib;DB_CLOSE_DELAY=-1;AUTO_SERVER=FALSE";
     }
@@ -37,7 +30,6 @@ public class DatabaseManager {
     private static final String DB_PASSWORD = "";
 
     public DatabaseManager() {
-        // Register H2 driver explicitly (needed when bundled in fat JAR)
         try {
             Class.forName("org.h2.Driver");
         } catch (ClassNotFoundException e) {
@@ -45,8 +37,6 @@ public class DatabaseManager {
         }
         initializeDatabase();
     }
-
-    // ── Schema creation ───────────────────────────────────────────────────────
 
     private void initializeDatabase() {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
@@ -61,6 +51,18 @@ public class DatabaseManager {
     private void createTables(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
 
+            // Users table for authentication
+            stmt.execute(
+                    "CREATE TABLE IF NOT EXISTS Users (" +
+                            "  id       VARCHAR(36)  PRIMARY KEY," +
+                            "  username VARCHAR(100) UNIQUE NOT NULL," +
+                            "  password VARCHAR(255) NOT NULL," +
+                            "  role     VARCHAR(20)  NOT NULL," +    // 'ADMIN' or 'STUDENT'
+                            "  name     VARCHAR(255) NOT NULL," +
+                            "  studentId VARCHAR(100)" +             // only for students
+                            ")"
+            );
+
             // Books Table
             stmt.execute(
                     "CREATE TABLE IF NOT EXISTS Books (" +
@@ -74,7 +76,6 @@ public class DatabaseManager {
             );
 
             // Members Table
-            // contactInfo is made nullable so auto-created members don't conflict on UNIQUE
             stmt.execute(
                     "CREATE TABLE IF NOT EXISTS Members (" +
                             "  id          VARCHAR(36)  PRIMARY KEY," +
@@ -83,7 +84,7 @@ public class DatabaseManager {
                             ")"
             );
 
-            // Borrowings Table — added batch and department columns
+            // Borrowings Table
             stmt.execute(
                     "CREATE TABLE IF NOT EXISTS Borrowings (" +
                             "  id         VARCHAR(36) PRIMARY KEY," +
@@ -99,24 +100,31 @@ public class DatabaseManager {
                             ")"
             );
 
-            // Prebookings Table
+            // Prebookings Table — pickupDate is the user-chosen pickup date
             stmt.execute(
                     "CREATE TABLE IF NOT EXISTS Prebookings (" +
                             "  id          VARCHAR(36)  PRIMARY KEY," +
                             "  bookId      VARCHAR(36)  NOT NULL," +
                             "  memberId    VARCHAR(36)  NOT NULL," +
                             "  prebookDate DATE         NOT NULL," +
+                            "  pickupDate  DATE," +
                             "  status      VARCHAR(50)  NOT NULL," +
                             "  FOREIGN KEY (bookId)   REFERENCES Books(id)," +
                             "  FOREIGN KEY (memberId) REFERENCES Members(id)" +
                             ")"
             );
+
+            // Migrate: add pickupDate column if upgrading from old schema
+            try {
+                stmt.execute("ALTER TABLE Prebookings ADD COLUMN IF NOT EXISTS pickupDate DATE");
+            } catch (Exception ignored) {}
         }
     }
 
-    // ── Sample data (only inserted once, on first run) ────────────────────────
-
     private void insertSampleDataIfEmpty(Connection conn) throws SQLException {
+        // Always ensure default admin exists
+        ensureDefaultAdmin(conn);
+
         if (hasData(conn, "Books")) {
             System.out.println("Database already has data — skipping sample insertion.");
             return;
@@ -124,7 +132,6 @@ public class DatabaseManager {
 
         System.out.println("First run detected — inserting sample data...");
 
-        // ── Sample books ──────────────────────────────────────────────────────
         String bookSql = "INSERT INTO Books (id, title, author, isbn, totalCopies, availableCopies) VALUES (?, ?, ?, ?, ?, ?)";
         String[] bookIds = new String[6];
         for (int i = 0; i < 6; i++) bookIds[i] = UUID.randomUUID().toString();
@@ -143,13 +150,12 @@ public class DatabaseManager {
                 ps.setString(2, (String) row[1]);
                 ps.setString(3, (String) row[2]);
                 ps.setString(4, (String) row[3]);
-                ps.setInt(5, (Integer) row[4]);
-                ps.setInt(6, (Integer) row[5]);
+                ps.setInt(5,    (Integer) row[4]);
+                ps.setInt(6,    (Integer) row[5]);
                 ps.executeUpdate();
             }
         }
 
-        // ── Sample members ────────────────────────────────────────────────────
         String memberSql = "INSERT INTO Members (id, name, contactInfo) VALUES (?, ?, ?)";
         String memberId1 = UUID.randomUUID().toString();
         String memberId2 = UUID.randomUUID().toString();
@@ -161,10 +167,8 @@ public class DatabaseManager {
             ps.setString(1, memberId3); ps.setString(2, "Nadia Hossain");  ps.setString(3, "nadia@example.com");    ps.executeUpdate();
         }
 
-        // ── Sample borrowings ─────────────────────────────────────────────────
         String borrowSql = "INSERT INTO Borrowings (id, bookId, memberId, batch, department, borrowDate, dueDate, returnDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(borrowSql)) {
-            // Active borrow — due in 5 days
             ps.setString(1, UUID.randomUUID().toString());
             ps.setString(2, bookIds[0]);
             ps.setString(3, memberId1);
@@ -175,7 +179,6 @@ public class DatabaseManager {
             ps.setNull(8, Types.DATE);
             ps.executeUpdate();
 
-            // Overdue borrow — 1 day overdue
             ps.setString(1, UUID.randomUUID().toString());
             ps.setString(2, bookIds[1]);
             ps.setString(3, memberId2);
@@ -186,7 +189,6 @@ public class DatabaseManager {
             ps.setNull(8, Types.DATE);
             ps.executeUpdate();
 
-            // Returned borrow
             ps.setString(1, UUID.randomUUID().toString());
             ps.setString(2, bookIds[2]);
             ps.setString(3, memberId3);
@@ -194,25 +196,40 @@ public class DatabaseManager {
             ps.setString(5, "CSE");
             ps.setDate(6, Date.valueOf(LocalDate.now().minusDays(20)));
             ps.setDate(7, Date.valueOf(LocalDate.now().minusDays(6)));
-            ps.setDate(8, Date.valueOf(LocalDate.now().minusDays(8))); // returned early
+            ps.setDate(8, Date.valueOf(LocalDate.now().minusDays(8)));
             ps.executeUpdate();
         }
 
-        // ── Sample prebooking ─────────────────────────────────────────────────
-        String prebookSql = "INSERT INTO Prebookings (id, bookId, memberId, prebookDate, status) VALUES (?, ?, ?, ?, ?)";
+        String prebookSql = "INSERT INTO Prebookings (id, bookId, memberId, prebookDate, pickupDate, status) VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(prebookSql)) {
             ps.setString(1, UUID.randomUUID().toString());
             ps.setString(2, bookIds[3]);
             ps.setString(3, memberId1);
-            ps.setDate(4, Date.valueOf(LocalDate.now().plusDays(4)));
-            ps.setString(5, "PENDING");
+            ps.setDate(4, Date.valueOf(LocalDate.now()));
+            ps.setDate(5, Date.valueOf(LocalDate.now().plusDays(4)));
+            ps.setString(6, "PENDING");
             ps.executeUpdate();
         }
 
         System.out.println("Sample data inserted successfully.");
     }
 
-    // ── Utilities ─────────────────────────────────────────────────────────────
+    private void ensureDefaultAdmin(Connection conn) throws SQLException {
+        String check = "SELECT COUNT(*) FROM Users WHERE role = 'ADMIN'";
+        try (Statement s = conn.createStatement(); ResultSet rs = s.executeQuery(check)) {
+            if (rs.next() && rs.getInt(1) > 0) return; // admin already exists
+        }
+        String sql = "INSERT INTO Users (id, username, password, role, name, studentId) VALUES (?, ?, ?, ?, ?, NULL)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, UUID.randomUUID().toString());
+            ps.setString(2, "admin");
+            ps.setString(3, "admin123");  // plain text for simplicity
+            ps.setString(4, "ADMIN");
+            ps.setString(5, "Library Admin");
+            ps.executeUpdate();
+            System.out.println("Default admin created: username=admin, password=admin123");
+        }
+    }
 
     private boolean hasData(Connection conn, String tableName) throws SQLException {
         try (Statement stmt = conn.createStatement();
@@ -221,7 +238,6 @@ public class DatabaseManager {
         }
     }
 
-    /** Returns a new JDBC connection to the persistent H2 file database. */
     public Connection getConnection() throws SQLException {
         return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
     }
